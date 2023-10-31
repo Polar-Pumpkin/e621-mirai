@@ -1,6 +1,7 @@
 package me.parrot.mirai.data
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * e621
@@ -16,5 +17,5 @@ data class PostSample(
     val height: Int,
     val width: Int,
     val url: String,
-    val alternates: String
+    val alternates: JsonObject
 )

@@ -16,11 +16,13 @@ import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.buildMessageChain
 import net.mamoe.mirai.message.data.content
+import net.mamoe.mirai.message.data.flash
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import net.mamoe.mirai.utils.ExternalResource.Companion.uploadAsImage
 import okhttp3.Credentials
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -34,6 +36,7 @@ import kotlin.coroutines.CoroutineContext
 object SearchListener : SimpleListenerHost() {
 
     private val pattern = Regex("来张(?<search>.+)图")
+    private var timestamp = System.currentTimeMillis()
 
     private val searchPermission by lazy {
         PermissionService.INSTANCE.register(
@@ -49,9 +52,10 @@ object SearchListener : SimpleListenerHost() {
     }
 
     override fun handleException(context: CoroutineContext, exception: Throwable) {
-        exception.printStackTrace()
-        val event = exception.event ?: return
         val cause = exception.rootCause
+        cause.printStackTrace()
+
+        val event = exception.event ?: return
         if (event is MessageEvent) {
             E621.launch {
                 event.subject.sendMessage(buildMessageChain {
@@ -76,6 +80,12 @@ object SearchListener : SimpleListenerHost() {
             return
         }
 
+        if (System.currentTimeMillis() - timestamp < TimeUnit.SECONDS.toMillis(Settings.interval)) {
+            subject.sendMessage(Responses.cooldown.randomOrNull() ?: return)
+            return
+        }
+        timestamp = System.currentTimeMillis()
+
         val url = "https://e621.net/posts.json".toHttpUrl()
             .newBuilder()
             .addQueryParameter("tags", Settings.alias[search] ?: search)
@@ -93,13 +103,14 @@ object SearchListener : SimpleListenerHost() {
                 return
             }
 
-            val posts = Json.decodeFromString<List<Post>>(response.body!!.string())
+            val payload = Json.decodeFromString<Map<String, List<Post>>>(response.body!!.string())
+            val posts = payload["posts"]!!
             if (posts.isEmpty()) {
                 subject.sendMessage(Responses.empty.randomOrNull() ?: return)
                 return
             }
 
-            val post = posts.sortedBy { it.score.total }.random()
+            val post = posts.sortedBy { it.score.total }.take(10).random()
             if (post.rating != "s" && !commander.hasPermission(sensitivePermission)) {
                 subject.sendMessage(Responses.sensitive.randomOrNull() ?: return)
                 return
@@ -111,7 +122,15 @@ object SearchListener : SimpleListenerHost() {
                     return
                 }
                 val resource = download.body!!.byteStream().toExternalResource(post.file.extension)
-                subject.sendMessage(resource.uploadAsImage(subject))
+                subject.sendMessage(
+                    resource.uploadAsImage(subject).let {
+                        if (post.rating != "s") {
+                            it.flash()
+                        } else {
+                            it
+                        }
+                    }
+                )
             }
         }
     }

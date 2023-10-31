@@ -1,10 +1,11 @@
-@file:UseContextualSerialization(Date::class)
+@file:UseSerializers(DateSerializer::class)
 
 package me.parrot.mirai.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
+import kotlinx.serialization.UseSerializers
+import me.parrot.mirai.serializer.DateSerializer
 import java.util.*
 
 /**
@@ -36,7 +37,7 @@ data class Post(
     @SerialName("fav_count")
     val favorite: Int,
     val sources: List<String>,
-    val pools: List<String>,
+    val pools: List<Int>,
     val relationships: PostRelationShip,
     @SerialName("approver_id")
     val approverId: Int?,
@@ -49,5 +50,5 @@ data class Post(
     val isFavorited: Boolean,
     @SerialName("has_notes")
     val hasNotes: Boolean,
-    val duration: String?
+    val duration: Double?
 )

@@ -24,4 +24,6 @@ object Responses : AutoSavePluginConfig("responses") {
 
     val failure: MutableList<String> by value(mutableListOf("下载失败了呢"))
 
+    val cooldown: MutableList<String> by value(mutableListOf("太快了！会受不了的！(指 e621 的服务器)"))
+
 }

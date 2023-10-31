@@ -16,5 +16,6 @@ object Settings : AutoSavePluginConfig("settings") {
     val username: String by value()
     val token: String by value()
     val alias: MutableMap<String, String> by value()
+    val interval: Long by value(5L)
 
 }
