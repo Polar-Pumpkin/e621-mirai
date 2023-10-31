@@ -7,6 +7,8 @@ import me.parrot.mirai.E621
 import me.parrot.mirai.config.Responses
 import me.parrot.mirai.config.Settings
 import me.parrot.mirai.data.Post
+import me.parrot.mirai.util.Baffle
+import me.parrot.mirai.util.Histories
 import net.mamoe.mirai.console.command.CommandSender.Companion.toCommandSender
 import net.mamoe.mirai.console.permission.PermissionService
 import net.mamoe.mirai.console.permission.PermissionService.Companion.hasPermission
@@ -16,13 +18,10 @@ import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.buildMessageChain
 import net.mamoe.mirai.message.data.content
-import net.mamoe.mirai.message.data.flash
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import net.mamoe.mirai.utils.ExternalResource.Companion.uploadAsImage
 import okhttp3.Credentials
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -36,7 +35,6 @@ import kotlin.coroutines.CoroutineContext
 object SearchListener : SimpleListenerHost() {
 
     private val pattern = Regex("来张(?<search>.+)图")
-    private var timestamp = System.currentTimeMillis()
 
     private val searchPermission by lazy {
         PermissionService.INSTANCE.register(
@@ -80,11 +78,10 @@ object SearchListener : SimpleListenerHost() {
             return
         }
 
-        if (System.currentTimeMillis() - timestamp < TimeUnit.SECONDS.toMillis(Settings.interval)) {
+        if (!Baffle.next(subject.id)) {
             subject.sendMessage(Responses.cooldown.randomOrNull() ?: return)
             return
         }
-        timestamp = System.currentTimeMillis()
 
         val search = Settings.alias[keyword] ?: keyword
         E621.logger.info("准备搜索: $search")
@@ -107,13 +104,17 @@ object SearchListener : SimpleListenerHost() {
             }
 
             val payload = Json.decodeFromString<Map<String, List<Post>>>(response.body!!.string())
+            val viewed = Histories.getViewed()
             val posts = payload["posts"]!!
+                .sortedByDescending { it.score.total }
+                .take(10)
+                .filter { it.id !in viewed }
             if (posts.isEmpty()) {
                 subject.sendMessage(Responses.empty.randomOrNull() ?: return)
                 return
             }
 
-            val post = posts.sortedBy { it.score.total }.take(10).random()
+            val post = posts.random()
             if (post.rating != "s" && !commander.hasPermission(sensitivePermission)) {
                 subject.sendMessage(Responses.sensitive.randomOrNull() ?: return)
                 return
@@ -124,17 +125,12 @@ object SearchListener : SimpleListenerHost() {
                     subject.sendMessage(Responses.failure.randomOrNull() ?: return)
                     return
                 }
+
+                Histories.record(sender.id, post)
                 download.body!!.byteStream().use { stream ->
-                    val resource = stream.toExternalResource(post.file.extension)
-                    subject.sendMessage(
-                        resource.uploadAsImage(subject).let {
-                            if (post.rating != "s") {
-                                it.flash()
-                            } else {
-                                it
-                            }
-                        }
-                    )
+                    val resource = stream.toExternalResource(post.file.extension).toAutoCloseable()
+                    val image = subject.uploadImage(resource)
+                    subject.sendMessage(image)
                 }
             }
         }
