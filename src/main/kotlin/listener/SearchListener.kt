@@ -74,7 +74,7 @@ object SearchListener : SimpleListenerHost() {
     suspend fun MessageEvent.onMessage() {
         val content = message.content
         val result = pattern.matchEntire(content) ?: return
-        val search = result.groups["search"]?.value ?: return
+        val keyword = result.groups["search"]?.value?.trim() ?: return
         val commander = toCommandSender()
         if (!commander.hasPermission(searchPermission)) {
             return
@@ -86,9 +86,12 @@ object SearchListener : SimpleListenerHost() {
         }
         timestamp = System.currentTimeMillis()
 
+        val search = Settings.alias[keyword] ?: keyword
+        E621.logger.info("准备搜索: $search")
+
         val url = "https://e621.net/posts.json".toHttpUrl()
             .newBuilder()
-            .addQueryParameter("tags", Settings.alias[search] ?: search)
+            .addQueryParameter("tags", search)
             .addQueryParameter("page", "1")
             .build()
         val request = Request.Builder()
@@ -121,16 +124,18 @@ object SearchListener : SimpleListenerHost() {
                     subject.sendMessage(Responses.failure.randomOrNull() ?: return)
                     return
                 }
-                val resource = download.body!!.byteStream().toExternalResource(post.file.extension)
-                subject.sendMessage(
-                    resource.uploadAsImage(subject).let {
-                        if (post.rating != "s") {
-                            it.flash()
-                        } else {
-                            it
+                download.body!!.byteStream().use { stream ->
+                    val resource = stream.toExternalResource(post.file.extension)
+                    subject.sendMessage(
+                        resource.uploadAsImage(subject).let {
+                            if (post.rating != "s") {
+                                it.flash()
+                            } else {
+                                it
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
