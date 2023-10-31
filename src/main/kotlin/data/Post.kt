@@ -22,7 +22,7 @@ data class Post(
     @SerialName("created_at")
     val createdAt: Date,
     @SerialName("updated_at")
-    val updatedAt: Date,
+    val updatedAt: Date?,
     val file: PostFile,
     val preview: PostPreview,
     val sample: PostSample,

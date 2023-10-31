@@ -15,6 +15,7 @@ import net.mamoe.mirai.console.permission.PermissionService.Companion.hasPermiss
 import net.mamoe.mirai.event.EventHandler
 import net.mamoe.mirai.event.SimpleListenerHost
 import net.mamoe.mirai.event.events.MessageEvent
+import net.mamoe.mirai.message.data.ImageType
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.buildMessageChain
 import net.mamoe.mirai.message.data.content
@@ -84,7 +85,7 @@ object SearchListener : SimpleListenerHost() {
         }
 
         val search = Settings.alias[keyword] ?: keyword
-        E621.logger.info("准备搜索: $search")
+        E621.logger.info(search)
 
         val url = "https://e621.net/posts.json".toHttpUrl()
             .newBuilder()
@@ -97,6 +98,7 @@ object SearchListener : SimpleListenerHost() {
             .header("Authorization", Credentials.basic(Settings.username, Settings.token))
             .build()
 
+        val hasSensitive = commander.hasPermission(sensitivePermission)
         E621.client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 subject.sendMessage(Responses.failure.randomOrNull() ?: return)
@@ -106,16 +108,20 @@ object SearchListener : SimpleListenerHost() {
             val payload = Json.decodeFromString<Map<String, List<Post>>>(response.body!!.string())
             val viewed = Histories.getViewed()
             val posts = payload["posts"]!!
+                .asSequence()
+                .filter { it.id !in viewed }
+                .filter { it.rating == "s" || hasSensitive }
+                .filter { ImageType.match(it.file.extension) != ImageType.UNKNOWN }
                 .sortedByDescending { it.score.total }
                 .take(10)
-                .filter { it.id !in viewed }
+                .toList()
             if (posts.isEmpty()) {
                 subject.sendMessage(Responses.empty.randomOrNull() ?: return)
                 return
             }
 
             val post = posts.random()
-            if (post.rating != "s" && !commander.hasPermission(sensitivePermission)) {
+            if (post.rating != "s" && !hasSensitive) {
                 subject.sendMessage(Responses.sensitive.randomOrNull() ?: return)
                 return
             }
