@@ -64,8 +64,9 @@ object E621Command : CompositeCommand(E621, "e621") {
                     reply { +"昵称 $name 已存在: $it" }
                     return
                 }
-                Settings.alias[name] = keyword
-                reply { +"已保存昵称: $name -> $keyword" }
+                val search = Settings.alias[keyword] ?: keyword
+                Settings.alias[name] = search
+                reply { +"已保存昵称: $name -> $search" }
             }
 
             "delete" -> {

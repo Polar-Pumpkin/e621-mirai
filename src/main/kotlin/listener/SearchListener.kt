@@ -90,7 +90,7 @@ object SearchListener : SimpleListenerHost() {
         val url = "https://e621.net/posts.json".toHttpUrl()
             .newBuilder()
             .addQueryParameter("tags", search)
-            .addQueryParameter("page", "1")
+            .addQueryParameter("limit", "60")
             .build()
         val request = Request.Builder()
             .url(url)
@@ -113,7 +113,7 @@ object SearchListener : SimpleListenerHost() {
                 .filter { it.rating == "s" || hasSensitive }
                 .filter { ImageType.match(it.file.extension) != ImageType.UNKNOWN }
                 .sortedByDescending { it.score.total }
-                .take(10)
+                .take(30)
                 .toList()
             if (posts.isEmpty()) {
                 subject.sendMessage(Responses.empty.randomOrNull() ?: return)
