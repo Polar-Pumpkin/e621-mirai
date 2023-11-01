@@ -11,6 +11,7 @@ import net.mamoe.mirai.console.command.UserCommandSender
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChainBuilder
 import net.mamoe.mirai.message.data.buildMessageChain
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
@@ -87,7 +88,7 @@ object E621Command : CompositeCommand(E621, "e621") {
                 val alias = Settings.alias.entries
                 val size = 10L
                 val total = alias.size
-                val pages = (total / size.toDouble()).roundToInt()
+                val pages = ceil(total / size.toDouble()).roundToInt()
                 if (page > pages) {
                     reply { +"没有第 $page 页, 共 $pages 页" }
                     return
@@ -145,7 +146,7 @@ object E621Command : CompositeCommand(E621, "e621") {
 
                 val size = 10L
                 val total = responses.size
-                val pages = (total / size.toDouble()).roundToInt()
+                val pages = ceil(total / size.toDouble()).roundToInt()
                 if (page > pages) {
                     reply { +"没有第 $page 页, 共 $pages 页" }
                     return

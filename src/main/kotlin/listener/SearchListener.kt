@@ -134,7 +134,7 @@ object SearchListener : SimpleListenerHost() {
 
                 Histories.record(sender.id, post)
                 download.body!!.byteStream().use { stream ->
-                    val resource = stream.toExternalResource(post.file.extension).toAutoCloseable()
+                    val resource = stream.toExternalResource("jpg").toAutoCloseable()
                     val image = subject.uploadImage(resource)
                     subject.sendMessage(image)
                 }
