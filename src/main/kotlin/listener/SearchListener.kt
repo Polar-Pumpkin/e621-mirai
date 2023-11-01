@@ -126,7 +126,7 @@ object SearchListener : SimpleListenerHost() {
                 return
             }
 
-            E621.client.newCall(Request.Builder().url(post.file.url).build()).execute().use { download ->
+            E621.client.newCall(Request.Builder().url(post.sample.url).build()).execute().use { download ->
                 if (!download.isSuccessful) {
                     subject.sendMessage(Responses.failure.randomOrNull() ?: return)
                     return
