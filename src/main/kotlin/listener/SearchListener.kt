@@ -113,14 +113,14 @@ object SearchListener : SimpleListenerHost() {
                 .filter { it.rating == "s" || hasSensitive }
                 .filter { ImageType.match(it.file.extension) != ImageType.UNKNOWN }
                 .sortedByDescending { it.score.total }
-                .take(30)
+                .take(40)
                 .toList()
             if (posts.isEmpty()) {
                 subject.sendMessage(Responses.empty.randomOrNull() ?: return)
                 return
             }
 
-            val post = posts.random()
+            val post = posts.shuffled().random()
             if (post.rating != "s" && !hasSensitive) {
                 subject.sendMessage(Responses.sensitive.randomOrNull() ?: return)
                 return

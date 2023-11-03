@@ -8,9 +8,11 @@ import me.parrot.mirai.util.Histories
 import net.mamoe.mirai.console.command.CommandSender
 import net.mamoe.mirai.console.command.CompositeCommand
 import net.mamoe.mirai.console.command.UserCommandSender
-import net.mamoe.mirai.message.data.At
-import net.mamoe.mirai.message.data.MessageChainBuilder
-import net.mamoe.mirai.message.data.buildMessageChain
+import net.mamoe.mirai.contact.User
+import net.mamoe.mirai.event.events.MessageEvent
+import net.mamoe.mirai.event.globalEventChannel
+import net.mamoe.mirai.message.data.*
+import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -32,20 +34,29 @@ object E621Command : CompositeCommand(E621, "e621") {
     }
 
     @SubCommand
-    suspend fun UserCommandSender.last() {
-        val post = Histories.getUser(user.id)
-        if (post == null) {
-            reply { +"未找到最近一次搜图记录" }
-            return
-        }
+    suspend fun UserCommandSender.last(user: User = this.user) {
+        val post = Histories.getUser(user.id) ?: return reply { +"未找到搜图记录" }
         reply {
-            +"Id: ${post.id}\n"
-            +"Rating: ${post.rating}\n"
-            +"Sources:\n"
-            post.sources.ifEmpty { listOf("(Empty)") }
+            +"\n"
+            +"e621 ID: ${post.id}\n"
+            +"评级: ${post.rating}\n"
+            +"喜欢: ${post.favorite}\n"
+            +"分数: ${post.score.total} (+${post.score.up} -${post.score.down})\n"
+
+            if (post.tags.artist.isNotEmpty()) {
+                +"作者\n"
+                post.tags.artist.forEach { +"$it\n" }
+            }
+
+            +"来源:\n"
+            post.sources
+                .ifEmpty { listOf("(无)") }
                 .forEach { +"$it\n" }
-            +"Description:\n"
-            +post.description
+
+            if (post.description.isNotBlank()) {
+                +"描述:\n"
+                +post.description
+            }
         }
     }
 
@@ -54,16 +65,32 @@ object E621Command : CompositeCommand(E621, "e621") {
         when (action) {
             "create" -> {
                 val parts = argument.split("->", limit = 2)
-                if (parts.size != 2) {
-                    reply { +"格式错误, 请使用: 昵称->实际关键词" }
+                val name = parts[0]
+                Settings.alias[name]?.let {
+                    return reply { +"昵称 $name 已存在: $it" }
+                }
+
+                if (parts.size == 1) {
+                    if (this !is UserCommandSender) {
+                        return reply { +"格式错误, 请使用: 昵称->实际关键词" }
+                    }
+                    E621.globalEventChannel()
+                        .filterIsInstance<MessageEvent>()
+                        .filter { it.sender.id == user.id }
+                        .subscribeOnce<MessageEvent> { _ ->
+                            val contents = message.contentsList().filter { it !is UnsupportedMessage }
+                            val texts = contents.filterIsInstance<PlainText>()
+                            if (contents.size != 1 || contents.size != texts.size) {
+                                return@subscribeOnce reply { +"请发送一条仅含有文本内容的消息以设置实际关键词, 本次编辑已取消" }
+                            }
+                            val keyword = texts.first().content
+                            Settings.alias[name] = keyword
+                            reply { +"已保存昵称: $name -> $keyword" }
+                        }
                     return
                 }
 
-                val (name, keyword) = parts
-                Settings.alias[name]?.let {
-                    reply { +"昵称 $name 已存在: $it" }
-                    return
-                }
+                val keyword = parts[1]
                 val search = Settings.alias[keyword] ?: keyword
                 Settings.alias[name] = search
                 reply { +"已保存昵称: $name -> $search" }
@@ -80,29 +107,10 @@ object E621Command : CompositeCommand(E621, "e621") {
             }
 
             "list" -> {
-                val page = argument.toIntOrNull()?.takeIf { it > 0 }
-                if (page == null) {
-                    reply { +"页码错误, 请使用正整数" }
-                    return
-                }
-
-                val alias = Settings.alias.entries
-                val size = 10L
-                val total = alias.size
-                val pages = ceil(total / size.toDouble()).roundToInt()
-                if (page > pages) {
-                    reply { +"没有第 $page 页, 共 $pages 页" }
-                    return
-                }
-                reply {
-                    +"第 $page 页 / 共 $pages 页\n"
-                    alias.stream()
-                        .skip((page - 1) * size)
-                        .limit(size)
-                        .forEach { (name, keyword) ->
-                            +"$name -> $keyword\n"
-                        }
-                }
+                val page = argument.toIntOrNull()
+                    ?.takeIf { it > 0 }
+                    ?: return reply { +"页码错误, 请使用正整数" }
+                Settings.alias.entries.onPage(page) { (name, keyword) -> +"$name -> $keyword\n" }
             }
 
             else -> reply { +"未知的操作: $action" }
@@ -139,26 +147,10 @@ object E621Command : CompositeCommand(E621, "e621") {
             }
 
             "list" -> {
-                val page = argument.toIntOrNull()?.takeIf { it > 0 }
-                if (page == null) {
-                    reply { +"页码错误, 请使用正整数" }
-                    return
-                }
-
-                val size = 10L
-                val total = responses.size
-                val pages = ceil(total / size.toDouble()).roundToInt()
-                if (page > pages) {
-                    reply { +"没有第 $page 页, 共 $pages 页" }
-                    return
-                }
-                reply {
-                    +"第 $page 页 / 共 $pages 页\n"
-                    responses.stream()
-                        .skip((page - 1) * size)
-                        .limit(size)
-                        .forEach { +"$it\n" }
-                }
+                val page = argument.toIntOrNull()
+                    ?.takeIf { it > 0 }
+                    ?: return reply { +"页码错误, 请使用正整数" }
+                responses.onPage(page) { +"$it\n" }
             }
 
             else -> reply { +"未知的操作: $action" }
@@ -173,6 +165,29 @@ object E621Command : CompositeCommand(E621, "e621") {
             }
             block()
         })
+    }
+
+    private suspend fun MessageEvent.reply(block: MessageChainBuilder.() -> Unit) {
+        subject.sendMessage(buildMessageChain {
+            +message.quote()
+            +" "
+            block()
+        })
+    }
+
+    context(CommandSender)
+    private suspend fun <E> Collection<E>.onPage(page: Int, size: Long = 10L, block: MessageChainBuilder.(E) -> Unit) {
+        val pages = ceil(this.size / size.toDouble()).roundToInt()
+        if (page < 1 || page > pages) {
+            return reply { +"未找到第 $page 页, 共 $pages 页" }
+        }
+        reply {
+            +"第 $page 页 / 共 $pages 页\n"
+            this@onPage.stream()
+                .skip((page - 1) * size)
+                .limit(size)
+                .forEach { block(it) }
+        }
     }
 
 }

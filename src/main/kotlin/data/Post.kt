@@ -31,7 +31,7 @@ data class Post(
     @SerialName("locked_tags")
     val lockedTags: List<String>,
     @SerialName("change_seq")
-    val changeSeq: Int,
+    val sequenceId: Int,
     val flags: PostFlag,
     val rating: String,
     @SerialName("fav_count")

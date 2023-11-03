@@ -21,3 +21,9 @@ repositories {
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
 }
+
+tasks.compileKotlin {
+    kotlinOptions {
+        freeCompilerArgs += listOf("-Xcontext-receivers")
+    }
+}
