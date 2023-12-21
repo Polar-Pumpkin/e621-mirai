@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
  */
 object Baffle {
 
-    private val timestamp = System.currentTimeMillis()
+    private var timestamp = 0L
     private val individuals = mutableMapOf<Long, Long>()
 
     private val second = TimeUnit.SECONDS.toMillis(1)
@@ -22,15 +22,22 @@ object Baffle {
 
     fun next(id: Long, update: Boolean = true): Boolean {
         val now = System.currentTimeMillis()
+        // Shared cooldown: 1s
+        if (now - timestamp < second) {
+            return false
+        }
+
         val last = individuals[id]
+        // Individuals cooldown: configuration
+        if (last != null && now - last < interval) {
+            return false
+        }
+        // Update shared & individuals timestamp
+        timestamp = now
         if (update) {
             individuals[id] = now
         }
-
-        if (now - timestamp < second || last == null) {
-            return false
-        }
-        return now - last >= interval
+        return true
     }
 
 }
