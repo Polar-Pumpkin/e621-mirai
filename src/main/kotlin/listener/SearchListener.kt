@@ -35,7 +35,7 @@ import kotlin.coroutines.CoroutineContext
  */
 object SearchListener : SimpleListenerHost() {
 
-    private val pattern = Regex("来张(?<search>.+)图")
+    private val pattern = Regex("来张(?<search>.+?)(?<coerce>清水|色)?图")
 
     private val searchPermission by lazy {
         PermissionService.INSTANCE.register(
@@ -71,9 +71,8 @@ object SearchListener : SimpleListenerHost() {
 
     @EventHandler
     suspend fun MessageEvent.onMessage() {
-        val content = message.content
-        val result = pattern.matchEntire(content) ?: return
-        val keyword = result.groups["search"]?.value?.trim() ?: return
+        val match = pattern.matchEntire(message.content) ?: return
+        val keyword = match.groups["search"]?.value?.trim() ?: return
         val commander = toCommandSender()
         if (!commander.hasPermission(searchPermission)) {
             return
@@ -110,7 +109,13 @@ object SearchListener : SimpleListenerHost() {
             val posts = payload["posts"]!!
                 .asSequence()
                 .filter { it.id !in viewed }
-                .filter { it.rating == "s" || hasSensitive }
+                .filter {
+                    when (match.groups["coerce"]?.value) {
+                        "清水" -> it.rating == "s"
+                        "色" -> it.rating != "s"
+                        else -> hasSensitive || it.rating == "s"
+                    }
+                }
                 .filter { ImageType.match(it.file.extension) != ImageType.UNKNOWN }
                 .sortedByDescending { it.score.total }
                 .take(40)

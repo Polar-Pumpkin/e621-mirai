@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "me.parrot.mirai"
-version = "1.0.1"
+version = "1.0.2"
 
 mirai {
     jvmTarget = JavaVersion.VERSION_1_8
