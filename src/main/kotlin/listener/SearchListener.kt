@@ -49,6 +49,12 @@ object SearchListener : SimpleListenerHost() {
             "Allow to search sensitive images on chat"
         )
     }
+    private val permanentPermission by lazy {
+        PermissionService.INSTANCE.register(
+            E621.permissionId("permanent-content"),
+            "Bypass auto-recall of sensitive content"
+        )
+    }
 
     override fun handleException(context: CoroutineContext, exception: Throwable) {
         val cause = exception.rootCause
@@ -112,7 +118,7 @@ object SearchListener : SimpleListenerHost() {
                 .filter {
                     when (match.groups["coerce"]?.value) {
                         "清水" -> it.rating == "s"
-                        "色" -> it.rating != "s"
+                        "涩", "铯", "瑟", "色" -> it.rating != "s"
                         else -> hasSensitive || it.rating == "s"
                     }
                 }
