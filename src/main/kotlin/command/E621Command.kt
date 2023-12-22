@@ -41,37 +41,31 @@ object E621Command : CompositeCommand(E621, "e621") {
             +"【e621 ID】${post.id}\n"
             +"【评级】${post.rating.uppercase()}\n"
             +"【喜欢】${post.favorite}\n"
-            +"【分数】${post.score.total} (+${post.score.up} -${post.score.down})\n"
-
-            +"\n"
-            with(post.tags) {
-                +"【通用】\n"
-                +general.asTags()
-                +"【画师】\n"
-                +artist.asTags()
-                +"【版权】\n"
-                +copyright.asTags()
-                +"【角色】\n"
-                +character.asTags()
-                +"【种族】\n"
-                +species.asTags()
-                +"【无效】\n"
-                +invalid.asTags()
-                +"【图像元数据】\n"
-                +meta.asTags()
-                +"【信息修正】\n"
-                +lore.asTags()
-            }
-
-            +"\n"
+            +"【分数】${post.score.total} (+${post.score.up}, ${post.score.down})\n"
+            post.tags.artist.takeIf { it.isNotEmpty() }?.asTags("【画师】\n")
             +"【来源】\n"
             post.sources
                 .ifEmpty { listOf("(无)") }
                 .forEach { +"$it\n" }
-
             if (post.description.isNotBlank()) {
                 +"【描述】\n"
                 +post.description
+            }
+        }
+    }
+
+    @SubCommand
+    suspend fun UserCommandSender.lastTags(user: User = this.user) {
+        val post = Histories.getUser(user.id) ?: return reply { +"未找到搜图记录" }
+        reply {
+            with(post.tags) {
+                +general.asTags("【通用】\n")
+                +artist.asTags("【艺术家】\n")
+                +copyright.asTags("【版权】\n")
+                +character.asTags("【角色】\n")
+                +species.asTags("【种族】\n")
+                +invalid.asTags("【无效标签】\n")
+                +lore.asTags("【补充信息】\n")
             }
         }
     }
@@ -174,8 +168,8 @@ object E621Command : CompositeCommand(E621, "e621") {
         }
     }
 
-    private fun List<String>.asTags(suffix: String = "\n"): String {
-        return joinToString(" ") { it.replace(' ', '_') } + suffix
+    private fun List<String>.asTags(prefix: String = "\n", suffix: String = "\n"): String {
+        return prefix + joinToString(" ") { it.replace(' ', '_') } + suffix
     }
 
     private suspend fun CommandSender.reply(block: MessageChainBuilder.() -> Unit) {
@@ -196,7 +190,12 @@ object E621Command : CompositeCommand(E621, "e621") {
         })
     }
 
-    private suspend fun <E> Collection<E>.onPage(sender: CommandSender, page: Int, size: Long = 10L, block: MessageChainBuilder.(E) -> Unit) {
+    private suspend fun <E> Collection<E>.onPage(
+        sender: CommandSender,
+        page: Int,
+        size: Long = 10L,
+        block: MessageChainBuilder.(E) -> Unit
+    ) {
         val pages = ceil(this.size / size.toDouble()).roundToInt()
         if (page < 1 || page > pages) {
             return sender.reply { +"未找到第 $page 页, 共 $pages 页" }
